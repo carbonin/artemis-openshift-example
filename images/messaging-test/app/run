@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "manageiq/messaging"
+
+class MessagingTest
+  def initialize(mode, wait, queue)
+    @mode  = mode
+    @wait  = wait
+    @queue = queue
+  end
+
+  def run
+    @mode == "produce" ? produce : consume
+  end
+
+  private
+
+  def produce
+    message_num = 0
+    loop do
+      message_num += 1
+      client.publish_message(
+        :service => @queue,
+        :message => "message #{message_num}"
+      )
+      sleep @wait
+    end
+  end
+
+  def consume
+    client.subscribe_messages(:service => @queue) do |messages|
+      messages.each do |msg|
+        client.ack(msg.ack_ref)
+      end
+    end
+    loop do
+      sleep 1000
+    end
+  end
+
+  def client
+    @client ||= ManageIQ::Messaging::Client.open(
+      :host       => ENV["ARTEMIS_SERVICE_HOST"],
+      :port       => ENV["ARTEMIS_SERVICE_PORT"],
+      :password   => ENV["ARTEMIS_PASSWORD"],
+      :username   => ENV["ARTEMIS_USER"],
+      :client_ref => @mode
+    )
+  end
+end
+
+ManageIQ::Messaging.logger = Logger.new(STDOUT)
+MessagingTest.new(ENV["MESSAGING_MODE"], ENV["MESSAGING_WAIT"].to_i, ENV["QUEUE_NAME"]).run

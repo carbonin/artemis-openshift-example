@@ -1,0 +1,6 @@
+#!/bin/sh
+
+[ ! -e "${ARTEMIS_INSTANCE}/etc/broker.xml" ] && \
+  ${ARTEMIS_HOME}/bin/artemis create ${ARTEMIS_INSTANCE} --user ${ARTEMIS_USER} --password ${ARTEMIS_PASSWORD} --require-login --no-web
+
+exec ${ARTEMIS_INSTANCE}/bin/artemis run

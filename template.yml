@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: artemis
+metadata:
+  name: artemis
+  annotations:
+    description: Test app for activemq-artemis
+    tags: instant-app
+objects:
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: artemis-secrets
+  stringData:
+    artemis-user: "${ARTEMIS_USER}"
+    artemis-password: "${ARTEMIS_PASSWORD}"
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: artemis
+    annotations:
+      description: Exposes the the artemis broker service
+  spec:
+    ports:
+    - name: artemis
+      port: 61613
+      targetPort: 61613
+    selector:
+      name: artemis
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: artemis
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: artemis
+    annotations:
+      description: Defines how to deploy the artemis server
+  spec:
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ConfigChange
+    replicas: 1
+    selector:
+      name: artemis
+    template:
+      metadata:
+        name: artemis
+        labels:
+          name: artemis
+      spec:
+        volumes:
+        - name: artemis-volume
+          persistentVolumeClaim:
+            claimName: artemis
+        containers:
+        - name: artemis
+          image: docker.io/carbonin/manageiq-artemis:2.4.0
+          ports:
+          - containerPort: 61613
+          readinessProbe:
+            timeoutSeconds: 1
+            initialDelaySeconds: 10
+            tcpSocket:
+              port: 61613
+          volumeMounts:
+          - name: artemis-volume
+            mountPath: "/var/lib/artemis"
+          env:
+          - name: ARTEMIS_USER
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-user
+          - name: ARTEMIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-password
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: queue-producer
+    annotations:
+      description: Defines how to deploy the queue producer pod
+  spec:
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ConfigChange
+    replicas: 1
+    selector:
+      name: producer
+    template:
+      metadata:
+        name: producer
+        labels:
+          name: producer
+      spec:
+        containers:
+        - name: producer
+          image: docker.io/carbonin/messaging-test:latest
+          env:
+          - name: ARTEMIS_USER
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-user
+          - name: ARTEMIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-password
+          - name: MESSAGING_MODE
+            value: produce
+          - name: MESSAGING_WAIT
+            value: "1"
+          - name: QUEUE_NAME
+            value: test_queue
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: queue-consumer
+    annotations:
+      description: Defines how to deploy the queue consumer pod
+  spec:
+    strategy:
+      type: Recreate
+    triggers:
+    - type: ConfigChange
+    replicas: 1
+    selector:
+      name: consumer
+    template:
+      metadata:
+        name: consumer
+        labels:
+          name: consumer
+      spec:
+        containers:
+        - name: consumer
+          image: docker.io/carbonin/messaging-test:latest
+          env:
+          - name: ARTEMIS_USER
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-user
+          - name: ARTEMIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: artemis-secrets
+                key: artemis-password
+          - name: MESSAGING_MODE
+            value: consumer
+          - name: MESSAGING_WAIT
+            value: "1"
+          - name: QUEUE_NAME
+            value: test_queue
+parameters:
+- name: ARTEMIS_USER
+  displayName: ActiveMQ Artemis Username
+  required: true
+  description: Username for logging into the Artemis Broker
+  from: "[a-zA-Z0-9]{12}"
+  generate: expression
+- name: ARTEMIS_PASSWORD
+  displayName: ActiveMQ Artemis Password
+  required: true
+  description: Password for ligging into the Artemis Broker
+  from: "[a-zA-Z0-9]{16}"
+  generate: expression
