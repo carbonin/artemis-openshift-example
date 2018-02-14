@@ -41,8 +41,8 @@ class MessagingTest
 
   def client
     @client ||= ManageIQ::Messaging::Client.open(
-      :host       => ENV["ARTEMIS_SERVICE_HOST"],
-      :port       => ENV["ARTEMIS_SERVICE_PORT"],
+      :host       => ENV["ARTEMIS_SERVICE_HOST"] || ENV["ARTEMIS_SERVICE_NAME"],
+      :port       => ENV["ARTEMIS_SERVICE_PORT"] || 61613,
       :password   => ENV["ARTEMIS_PASSWORD"],
       :username   => ENV["ARTEMIS_USER"],
       :client_ref => @mode

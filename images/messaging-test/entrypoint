@@ -18,7 +18,8 @@ function check_svc_status() {
   echo "${SVC_NAME}:${SVC_PORT} - accepting connections"
 }
 
-check_svc_status artemis 61613
+ARTEMIS_SERVICE_NAME="${ARTEMIS_SERVICE_NAME:-artemis}"
+check_svc_status $ARTEMIS_SERVICE_NAME 61613
 
 cd /opt/messaging-test
 exec ./run
